@@ -1,12 +1,21 @@
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { useThemeMode } from '../../components/theme-context';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function StatisticsScreen() {
-  const [activeTab, setActiveTab] = useState('Month');
 
+
+  const { darkModeEnabled } = useThemeMode();
+  const backgroundColor = darkModeEnabled ? '#1a1a1a' : '#f5f5f5';
+  const cardBackground = darkModeEnabled ? '#232323' : '#ffffff';
+  const textColor = darkModeEnabled ? '#fafafa' : '#232323';
+  const ActiveTab = darkModeEnabled ? '#1a1a1a' : '#4CAF50';
+
+  const [activeTab, setActiveTab] = useState('Month');
   const tabs = ['Day', 'Week', 'Month', 'Year'];
   const chartData = [
     { month: 'Mar', value: 120 },
@@ -14,22 +23,18 @@ export default function StatisticsScreen() {
     { month: 'May', value: 160 },
     { month: 'Jun', value: 200 }
   ];
-
   const maxValue = 200;
 
   return (
-    <ScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={null}>
-      
-      <ThemedView style={styles.container}>
+    <ScrollView style={{ backgroundColor }}>
+      <ThemedView style={[styles.container, { backgroundColor }] }>
         {/* Header Title */}
-        <ThemedText type="title" style={styles.headerTitle}>Statistics</ThemedText>
+        <ThemedText type="title" style={[styles.headerTitle, { color: textColor }]}>Statistics</ThemedText>
 
         {/* Energy Generated Card */}
-        <ThemedView style={styles.energyCard}>
+        <ThemedView style={[styles.energyCard, { backgroundColor: cardBackground }] }>
           <View style={styles.energyHeader}>
-            <ThemedText type="defaultSemiBold" style={styles.energyTitle}>
+            <ThemedText type="defaultSemiBold" style={[styles.energyTitle, { color: textColor }] }>
               Energy generated
             </ThemedText>
             <View style={styles.increaseBadge}>
@@ -37,11 +42,11 @@ export default function StatisticsScreen() {
               <ThemedText style={styles.increaseText}>2.13Wh (14%)</ThemedText>
             </View>
           </View>
-          <ThemedText type="title" style={styles.energyValue}>30.276KWh</ThemedText>
+          <ThemedText type="title" style={[styles.energyValue, { color: textColor }] }>30.276KWh</ThemedText>
         </ThemedView>
 
         {/* Time Filter Tabs */}
-        <ThemedView style={styles.tabContainer}>
+        <ThemedView style={[styles.tabContainer, { backgroundColor: cardBackground }] }>
           {tabs.map((tab) => (
             <TouchableOpacity
               key={tab}
@@ -54,7 +59,8 @@ export default function StatisticsScreen() {
               <ThemedText 
                 style={[
                   styles.tabText,
-                  activeTab === tab && styles.activeTabText
+                  activeTab === tab && styles.activeTabText,
+                  { color: textColor }
                 ]}
               >
                 {tab}
@@ -64,17 +70,16 @@ export default function StatisticsScreen() {
         </ThemedView>
 
         {/* Bar Chart */}
-        <ThemedView style={styles.chartCard}>
+        <ThemedView style={[styles.chartCard, { backgroundColor: cardBackground }] }>
           <View style={styles.chartContainer}>
             {/* Y-axis labels */}
             <View style={styles.yAxis}>
-              <ThemedText style={styles.yLabel}>200KWh</ThemedText>
-              <ThemedText style={styles.yLabel}>150KWh</ThemedText>
-              <ThemedText style={styles.yLabel}>100KWh</ThemedText>
-              <ThemedText style={styles.yLabel}>50KWh</ThemedText>
-              <ThemedText style={styles.yLabel}>0</ThemedText>
+              <ThemedText style={[styles.yLabel, { color: textColor }] }>200KWh</ThemedText>
+              <ThemedText style={[styles.yLabel, { color: textColor }] }>150KWh</ThemedText>
+              <ThemedText style={[styles.yLabel, { color: textColor }] }>100KWh</ThemedText>
+              <ThemedText style={[styles.yLabel, { color: textColor }] }>50KWh</ThemedText>
+              <ThemedText style={[styles.yLabel, { color: textColor }] }>0</ThemedText>
             </View>
-            
             {/* Chart bars */}
             <View style={styles.chartBars}>
               {chartData.map((item, index) => (
@@ -87,7 +92,7 @@ export default function StatisticsScreen() {
                       ]} 
                     />
                   </View>
-                  <ThemedText style={styles.xLabel}>{item.month}</ThemedText>
+                  <ThemedText style={[styles.xLabel, { color: textColor }] }>{item.month}</ThemedText>
                 </View>
               ))}
             </View>
@@ -97,15 +102,15 @@ export default function StatisticsScreen() {
         {/* Stats Cards Row */}
         <View style={styles.statsRow}>
           {/* Today Card */}
-          <ThemedView style={styles.statsCard}>
-            <ThemedText style={styles.statsValue}>150kWh</ThemedText>
-            <ThemedText style={styles.statsLabel}>Today</ThemedText>
+          <ThemedView style={[styles.statsCard, { backgroundColor: cardBackground }] }>
+            <ThemedText style={[styles.statsValue, { color: textColor }] }>150kWh</ThemedText>
+            <ThemedText style={[styles.statsLabel, { color: textColor }] }>Today</ThemedText>
           </ThemedView>
 
           {/* This Month Card */}
-          <ThemedView style={styles.statsCard}>
-            <ThemedText style={styles.statsValue}>165KWh</ThemedText>
-            <ThemedText style={styles.statsLabel}>This month</ThemedText>
+          <ThemedView style={[styles.statsCard, { backgroundColor: cardBackground }] }>
+            <ThemedText style={[styles.statsValue, { color: textColor }] }>165KWh</ThemedText>
+            <ThemedText style={[styles.statsLabel, { color: textColor }] }>This month</ThemedText>
           </ThemedView>
         </View>
 
@@ -113,6 +118,7 @@ export default function StatisticsScreen() {
     </ScrollView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -172,7 +178,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   activeTab: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#4CAF50',
   },
   tabText: {
     fontSize: 14,

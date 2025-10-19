@@ -1,10 +1,15 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useState } from 'react';
+import { useThemeMode } from '../../components/theme-context';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
+export default function NotificationScreen() {
+
 // Komponen Notification Card dengan Ikon
-const NotificationCard = ({ title, value, description, type, isRead, onPress }) => {
+const NotificationCard = ({ title, value, description, type, isRead, onPress, cardBackground, textColor }) => {
   const getIconName = () => {
     switch (type) {
       case 'warning':
@@ -36,7 +41,7 @@ const NotificationCard = ({ title, value, description, type, isRead, onPress }) 
       <ThemedView style={[
         styles.notificationCard,
         !isRead && styles.unreadNotification,
-        { borderLeftColor: getIconColor() }
+        { borderLeftColor: getIconColor(), backgroundColor: cardBackground }
       ]}>
         <View style={styles.notificationHeader}>
           <View style={styles.titleContainer}>
@@ -46,19 +51,19 @@ const NotificationCard = ({ title, value, description, type, isRead, onPress }) 
               color={getIconColor()} 
               style={styles.icon}
             />
-            <ThemedText type="subtitle" style={styles.notificationTitle}>
+            <ThemedText type="subtitle" style={[styles.notificationTitle, { color: textColor }] }>
               {title}
             </ThemedText>
             {!isRead && <View style={styles.unreadDot} />}
           </View>
-          <ThemedText type="title" style={styles.notificationValue}>
+          <ThemedText type="title" style={[styles.notificationValue, { color: getIconColor() }] }>
             {value}
           </ThemedText>
         </View>
-        <ThemedText style={styles.notificationDescription}>
+        <ThemedText style={[styles.notificationDescription, { color: textColor }] }>
           {description}
         </ThemedText>
-        <ThemedText style={styles.notificationTime}>
+        <ThemedText style={[styles.notificationTime, { color: textColor }] }>
           2 hours ago
         </ThemedText>
       </ThemedView>
@@ -66,7 +71,10 @@ const NotificationCard = ({ title, value, description, type, isRead, onPress }) 
   );
 };
 
-export default function NotificationScreen() {
+  const { darkModeEnabled } = useThemeMode();
+  const backgroundColor = darkModeEnabled ? '#1a1a1a' : '#f5f5f5';
+  const cardBackground = darkModeEnabled ? '#232323' : '#ffffff';
+  const textColor = darkModeEnabled ? '#fafafa' : '#232323';
   // Data notifikasi dengan tipe dan status - memperbaiki ID yang duplikat
   const notifications = [
     {
@@ -124,10 +132,10 @@ export default function NotificationScreen() {
   const unreadCount = notifications.filter(notification => !notification.isRead).length;
 
   return (
-    <View style={styles.mainContainer}>
+    <View style={[styles.mainContainer, { backgroundColor }] }>
       {/* Header dengan jumlah notifikasi belum dibaca - TETAP */}
-      <View style={styles.header}>
-        <ThemedText type="title" style={styles.headerTitle}>
+      <View style={[styles.header, { backgroundColor }] }>
+        <ThemedText type="title" style={[styles.headerTitle, { color: textColor }] }>
           Notifications
         </ThemedText>
         {unreadCount > 0 && (
@@ -139,7 +147,7 @@ export default function NotificationScreen() {
 
       {/* Notifications List dan Clear All Button - BISA DI-SCROLL */}
       <ScrollView 
-        style={styles.scrollContainer}
+        style={[styles.scrollContainer, { backgroundColor } ]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -153,6 +161,8 @@ export default function NotificationScreen() {
             type={notification.type}
             isRead={notification.isRead}
             onPress={() => handleNotificationPress(notification.id)}
+            cardBackground={cardBackground}
+            textColor={textColor}
           />
         ))}
         
@@ -166,6 +176,7 @@ export default function NotificationScreen() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   mainContainer: {

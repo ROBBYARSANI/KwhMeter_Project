@@ -1,16 +1,29 @@
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useState } from 'react';
+import { useThemeMode } from '../../components/theme-context';
 import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 export default function SettingsScreen() {
+
+
   const [autoManual, setAutoManual] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const { darkModeEnabled, setDarkModeEnabled } = useThemeMode();
+
+  // Tentukan warna background dan section berdasarkan darkModeEnabled
+  const backgroundColor = darkModeEnabled ? '#1a1a1a' : '#f5f5f5';
+  const sectionBackgroundColor = darkModeEnabled ? '#232323' : '#ffffff';
+  const sectionTitleColor = darkModeEnabled ? '#e0e0e0' : '#232323';
+  const settingItemBackgroundColor = sectionBackgroundColor;
+  const settingTextColor = darkModeEnabled ? '#fafafa' : '#232323';
 
   return (
-    <View style={styles.mainContainer}>
+    <View style={[styles.mainContainer, { backgroundColor: backgroundColor}]}> 
       {/* Header */}
-      <View style={styles.header}>
-        <ThemedText type="title" style={styles.headerTitle}>
+      <View style={[styles.header, { backgroundColor: backgroundColor }]}>
+        <ThemedText type="title" style={[styles.headerTitle, { color: settingTextColor }]}>
           Settings
         </ThemedText>
       </View>
@@ -22,18 +35,18 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Alarm Section */}
-        <ThemedView style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Alarmat</ThemedText>
-          <ThemedView style={styles.settingItem}>
-            <ThemedText style={styles.settingText}>aaaaa</ThemedText>
+        <ThemedView style={[styles.section, { backgroundColor: sectionBackgroundColor }]}> 
+          <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Alarmat</ThemedText>
+          <ThemedView style={[styles.settingItem, { backgroundColor: settingItemBackgroundColor }]}> 
+            <ThemedText style={[styles.settingText, { color: settingTextColor }]}>aaaaa</ThemedText>
           </ThemedView>
         </ThemedView>
 
         {/* Auto/Manual Section */}
-        <ThemedView style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Operation Mode</ThemedText>
-          <ThemedView style={styles.settingItem}>
-            <ThemedText style={styles.settingText}>Auto/Manual</ThemedText>
+        <ThemedView style={[styles.section, { backgroundColor: sectionBackgroundColor }]}> 
+          <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Operation Mode</ThemedText>
+          <ThemedView style={[styles.settingItem, { backgroundColor: settingItemBackgroundColor }]}> 
+            <ThemedText style={[styles.settingText, { color: settingTextColor }]}>Auto/Manual</ThemedText>
             <Switch
               value={autoManual}
               onValueChange={setAutoManual}
@@ -44,29 +57,31 @@ export default function SettingsScreen() {
         </ThemedView>
 
         {/* Additional Settings bisa ditambahkan di sini */}
-        <ThemedView style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Preferences</ThemedText>
-          <ThemedView style={styles.settingItem}>
-            <ThemedText style={styles.settingText}>Notifications</ThemedText>
+        <ThemedView style={[styles.section, { backgroundColor: sectionBackgroundColor }]}> 
+          <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Preferences</ThemedText>
+          <ThemedView style={[styles.settingItem, { backgroundColor: settingItemBackgroundColor }]}> 
+            <ThemedText style={[styles.settingText, { color: settingTextColor }]}>Notifications</ThemedText>
             <Switch
-              value={true}
-              onValueChange={() => {}}
+              value={notificationsEnabled}
+              onValueChange={setNotificationsEnabled}
               trackColor={{ false: '#767577', true: '#4CAF50' }}
             />
           </ThemedView>
-          <ThemedView style={styles.settingItem}>
-            <ThemedText style={styles.settingText}>Dark Mode</ThemedText>
+          <ThemedView style={[styles.settingItem, { backgroundColor: settingItemBackgroundColor }]}> 
+            <ThemedText style={[styles.settingText, { color: settingTextColor }]}>Dark Mode</ThemedText>
             <Switch
-              value={true}
-              onValueChange={() => {}}
+              value={darkModeEnabled}
+              onValueChange={setDarkModeEnabled}
               trackColor={{ false: '#767577', true: '#4CAF50' }}
             />
           </ThemedView>
         </ThemedView>
       </ScrollView>
     </View>
+
   );
 }
+
 
 const styles = StyleSheet.create({
   mainContainer: {

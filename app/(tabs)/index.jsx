@@ -1,116 +1,154 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
+import { useState, useEffect } from 'react';
+import { useThemeMode } from '../../components/theme-context';
 import { ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-// Komponen PowerUsageCard
-const PowerUsageCard = () => {
+const PowerUsageCard = ({ cardBackground, textColor, powerUsage }) => {
+  const maxKwh = 30;
+  const percent = Math.min(100, Math.round((powerUsage / maxKwh) * 100));
   return (
-    <ThemedView style={styles.card}>
+    <ThemedView style={[styles.card, { backgroundColor: cardBackground }] }>
       <View style={styles.cardHeader}>
-        <ThemedText type="defaultSemiBold">Power Usage</ThemedText>
-        <Ionicons name="information-circle-outline" size={20} color="#888" />
+        <ThemedText type="defaultSemiBold" style={{ color: textColor }}>Power Usage</ThemedText>
+        <Ionicons name="information-circle-outline" size={20} color={textColor} />
       </View>
-      
       <View style={styles.powerContainer}>
-        <ThemedText type="title">30.276</ThemedText>
-        <ThemedText style={styles.powerUnit}>KWh</ThemedText>
+        <ThemedText type="title" style={{ color: textColor }}>{powerUsage.toFixed(2)}</ThemedText>
+        <ThemedText style={[styles.powerUnit, { color: textColor }]}>KWh</ThemedText>
       </View>
-      
       <View style={styles.progressContainer}>
-        <View style={styles.progressBackground}>
-          <View style={styles.progressFill} />
+        <View style={[styles.progressBackground, { backgroundColor: textColor === '#fafafa' ? '#333' : '#eee' }] }>
+          <View style={[styles.progressFill, { width: `${percent}%` }]} />
         </View>
-        <ThemedText style={styles.percentage}>40%</ThemedText>
+        <ThemedText style={[styles.percentage, { color: '#4CAF50' }]}>{percent}%</ThemedText>
       </View>
     </ThemedView>
   );
 };
 
-// Komponen StatsCard
-const StatsCard = ({ title, value, icon }) => {
+const StatsCard = ({ title, value, icon, cardBackground, textColor }) => {
   return (
-    <ThemedView style={styles.statsCard}>
+    <ThemedView style={[styles.statsCard, { backgroundColor: cardBackground }] }>
       <View style={styles.cardHeader}>
-        <ThemedText type="default">{title}</ThemedText>
+        <ThemedText type="default" style={{ color: textColor }}>{title}</ThemedText>
         <Ionicons name={icon} size={20} color="#4CAF50" />
       </View>
-      <ThemedText type="subtitle">{value}</ThemedText>
+      <ThemedText type="subtitle" style={{ color: textColor }}>{value}</ThemedText>
     </ThemedView>
   );
 };
 
-// Komponen ElectricityChart
-const ElectricityChart = () => {
-  const timeLabels = ['13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
-  
+const ElectricityChart = ({ cardBackground, textColor, usageHistory }) => {
+  const maxKwh = 100;
+  const hourLabels = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0') + ':00');
+  const kwhLabels = [100, 80, 60, 40, 20, 0];
+
+  const heightChart = 180;
+  const marginTopYAxis = -15;
+  const marginBottomXAxis = -3;
+
   return (
-    <ThemedView style={styles.chartCard}>
-      <ThemedText type="defaultSemiBold">Electricity Used Today</ThemedText>
-      <ThemedText type="title">140.65KWh</ThemedText>
-      
-      <View style={styles.chartContainer}>
-        <View style={styles.yAxis}>
-          <ThemedText style={styles.yLabel}>200kWh</ThemedText>
-          <ThemedText style={styles.yLabel}>150kWh</ThemedText>
-          <ThemedText style={styles.yLabel}>100kWh</ThemedText>
-          <ThemedText style={styles.yLabel}>50kWh</ThemedText>
-          <ThemedText style={styles.yLabel}>0</ThemedText>
+    <ThemedView style={[styles.chartCard, { backgroundColor: cardBackground, borderWidth: 1, borderColor: '#ccc' }] }>
+      <ThemedText type="defaultSemiBold" style={{ color: textColor }}>Electricity Used Today</ThemedText>
+      <View style={{ flexDirection: 'row', marginTop: 30 }}>
+        <View style={{ justifyContent: 'space-between', marginRight: 10, height: heightChart, marginTop: marginTopYAxis }}>
+          {kwhLabels.map(kwh => (
+            <ThemedText key={kwh} style={[styles.yLabel, { color: textColor }]}>{kwh} kWh</ThemedText>
+          ))}
         </View>
-        
-        <View style={styles.barsContainer}>
-          <View style={styles.barGroup}>
-            {[60, 80, 120, 160, 140, 100].map((height, index) => (
-              <View key={index} style={styles.barColumn}>
-                <View 
-                  style={[
-                    styles.bar, 
-                    { height: `${height/200 * 100}%` }
-                  ]} 
-                />
-                <ThemedText style={styles.xLabel}>{timeLabels[index]}</ThemedText>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'flex-end', height: heightChart }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: heightChart }}>
+            {usageHistory.map((kwh, hour) => (
+              <View key={hour} style={{ alignItems: 'center', width: 32 }}>
+                <View style={{
+                  width: 18,
+                  height: `${Math.max(8, Math.min(100, (kwh / maxKwh) * heightChart))}px`,
+                  backgroundColor: '#4CAF50',
+                  borderRadius: 4,
+                  marginBottom: marginBottomXAxis,
+                }} />
+                <ThemedText style={[styles.xLabel, { color: textColor, fontSize: 10 }]}>{hourLabels[hour]}</ThemedText>
               </View>
             ))}
           </View>
-        </View>
+        </ScrollView>
       </View>
     </ThemedView>
   );
 };
 
 export default function HomeScreen() {
+  const { darkModeEnabled } = useThemeMode();
+  const backgroundColor = darkModeEnabled ? '#1a1a1a' : '#f5f5f5';
+  const cardBackground = darkModeEnabled ? '#232323' : '#ffffff';
+  const textColor = darkModeEnabled ? '#fafafa' : '#232323';
+
+  const [data, setData] = useState({
+    powerUsage: 0,
+    voltage: 0,
+    current: 0,
+    consumed: 0,
+    timestamp: 0
+  });
+  const [usageHistory, setUsageHistory] = useState(Array(24).fill(0));
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let interval = setInterval(() => {
+      fetch('http://localhost:4000/api/realtime')
+        .then(res => res.json())
+        .then((newData) => {
+          setData(newData);
+          setUsageHistory(prev => {
+            const hour = new Date().getHours();
+            const updated = [...prev];
+            updated[hour] = newData.powerUsage;
+            return updated;
+          });
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayName = days[now.getDay()];
+  const date = now.getDate();
+  const month = months[now.getMonth()];
+  const year = now.getFullYear();
+  const hour = now.getHours().toString().padStart(2, '0');
+  const minute = now.getMinutes().toString().padStart(2, '0');
+
   return (
-    <ScrollView>
-      
-      {/* Header */}
-      <ThemedView style={styles.header}>
+    <ScrollView style={{ backgroundColor }}>
+      <ThemedView style={[styles.header, { backgroundColor }] }>
         <View>
-          <ThemedText type="default">Monday 18, 2023</ThemedText>
+          <ThemedText type="default" style={{ color: textColor }}>{`${dayName}, ${date} ${month} ${year} ${hour}:${minute}`}</ThemedText>
         </View>
       </ThemedView>
-
-      {/* Power Usage Card */}
-      <PowerUsageCard />
-
-      {/* Stats Cards */}
+      <PowerUsageCard cardBackground={cardBackground} textColor={textColor} powerUsage={data.powerUsage} />
       <View style={styles.statsRow}>
-        <StatsCard title="Voltage" value="15.2 v" icon="flash" />
-        <StatsCard title="Consumed" value="28.2 kwh" icon="battery-charging" />
+        <StatsCard title="Voltage" value={`${data.voltage} V`} icon="flash" cardBackground={cardBackground} textColor={textColor} />
+        <StatsCard title="Consumed" value={`${data.consumed} kWh`} icon="battery-charging" cardBackground={cardBackground} textColor={textColor} />
       </View>
-
       <View style={styles.statsRow}>
-        <StatsCard title="Current" value="3.2 A" icon="speedometer" />
-        <ThemedView style={styles.switchCard}>
-          <ThemedText type="default">Switch</ThemedText>
+        <StatsCard title="Current" value={`${data.current} A`} icon="speedometer" cardBackground={cardBackground} textColor={textColor} />
+        <ThemedView style={[styles.switchCard, { backgroundColor: cardBackground }] }>
+          <ThemedText type="default" style={{ color: textColor }}>Switch</ThemedText>
           <TouchableOpacity style={styles.switchButton}>
             <ThemedText type="defaultSemiBold" style={styles.switchText}>On</ThemedText>
           </TouchableOpacity>
         </ThemedView>
       </View>
-
-      {/* Electricity Chart */}
-      <ElectricityChart />
-
+      <ElectricityChart cardBackground={cardBackground} textColor={textColor} usageHistory={usageHistory} />
     </ScrollView>
   );
 }
