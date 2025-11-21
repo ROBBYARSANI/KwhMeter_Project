@@ -46,6 +46,7 @@ export default function SettingsScreen() {
   const [marker, setMarker] = useState(null);
   const [radius, setRadius] = useState(100);
   const [showMap, setShowMap] = useState(false);
+  const [locationDescription, setLocationDescription] = useState('');
 
   const backgroundColor = darkModeEnabled ? '#1a1a1a' : '#f5f5f5';
   const sectionBackgroundColor = darkModeEnabled ? '#232323' : '#ffffff';
@@ -131,8 +132,8 @@ export default function SettingsScreen() {
               <View style={{ width: '100%', height: 360 }}>
                 {Platform.OS !== 'web' && MapView ? (
                   // Only render native MapView when it's available. If not, show a helpful message.
-                  <MapView style={{ flex: 1 }} initialRegion={region || { latitude: -6.2, longitude: 106.816666, latitudeDelta: 0.01, longitudeDelta: 0.01 }} region={region} onPress={e => { const { latitude, longitude } = e.nativeEvent.coordinate; setMarker({ latitude, longitude }); }}>
-                    {marker && Marker && (<Marker coordinate={marker} draggable onDragEnd={e => setMarker(e.nativeEvent.coordinate)} />)}
+                  <MapView style={{ flex: 1 }} initialRegion={region || { latitude: -6.2, longitude: 106.816666, latitudeDelta: 0.01, longitudeDelta: 0.01 }} region={region} onPress={e => { const { latitude, longitude } = e.nativeEvent.coordinate; setMarker({ latitude, longitude }); setLocationDescription(`Latitude: ${latitude.toFixed(6)}, Longitude: ${longitude.toFixed(6)}`); }}>
+                    {marker && Marker && (<Marker coordinate={marker} draggable onDragEnd={e => { setMarker(e.nativeEvent.coordinate); setLocationDescription(`Latitude: ${e.nativeEvent.coordinate.latitude.toFixed(6)}, Longitude: ${e.nativeEvent.coordinate.longitude.toFixed(6)}`); }} />)}
                     {marker && Circle && (<Circle center={marker} radius={radius} strokeWidth={1} strokeColor={'rgba(76,175,80,0.6)'} fillColor={'rgba(76,175,80,0.2)'} />)}
                   </MapView>
                 ) : (
@@ -170,6 +171,25 @@ export default function SettingsScreen() {
                   <ThemedText style={{ color: settingTextColor }}>Radius: {radius} m</ThemedText>
                   <Slider minimumValue={50} maximumValue={1000} step={10} value={radius} onValueChange={setRadius} minimumTrackTintColor="#4CAF50" maximumTrackTintColor="#ccc" style={{ width: '100%' }} />
                 </View>
+
+                {locationDescription !== '' && (
+                  <View style={{ marginTop: 16 }}>
+                    <ThemedText style={[styles.settingText, { color: settingTextColor, marginBottom: 8 }]}>Keterangan Lokasi</ThemedText>
+                    <TextInput
+                      style={[styles.locationTextBox, {
+                        backgroundColor: darkModeEnabled ? '#333' : '#f5f5f5',
+                        color: settingTextColor,
+                        borderColor: '#4CAF50'
+                      }]}
+                      value={locationDescription}
+                      editable={false}
+                      multiline={true}
+                      numberOfLines={2}
+                      placeholder="Ketika Anda klik lokasi pada map, keterangan akan muncul di sini"
+                      placeholderTextColor={darkModeEnabled ? '#888' : '#aaa'}
+                    />
+                  </View>
+                )}
               </View>
             )}
 
@@ -199,4 +219,14 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '600', color: '#4CAF50', marginBottom: 12 },
   settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   settingText: { fontSize: 16, fontWeight: '500' },
+  locationTextBox: {
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 2,
+    minWidth: '100%',
+    textAlignVertical: 'top',
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });
