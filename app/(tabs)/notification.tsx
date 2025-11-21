@@ -2,14 +2,67 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { Animated, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { useThemeMode } from '../../components/theme-context';
+import { useNotifications } from './_layout';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
+interface NotificationCardProps {
+  title: string;
+  value: string;
+  description: string;
+  type: string;
+  isRead: boolean;
+  onPress: () => void;
+  cardBackground: string;
+  textColor: string;
+  timestamp: Date;
+  animatedValue?: Animated.Value;
+}
+
 export default function NotificationScreen() {
+  const { notifications, markAsRead, clearAllNotifications } = useNotifications();
+
+  const allNotifications = [...notifications];
+
+  // Animation setup
+  if (Platform.OS === 'android') {
+    UIManager.setLayoutAnimationEnabledExperimental && UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+
+  // Create animated values for each notification
+  const animatedValues = useRef<Animated.Value[]>([]);
+  if (animatedValues.current.length !== allNotifications.length) {
+    animatedValues.current = allNotifications.map(() => new Animated.Value(0));
+  }
+
+  const animateClearNotifications = () => {
+    // Configure layout animation for smooth removal
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+
+    // Animate from bottom to top with stagger
+    const animations = allNotifications.map((_, index) => {
+      const reverseIndex = allNotifications.length - 1 - index; // Start from bottom
+      return Animated.timing(animatedValues.current[index], {
+        toValue: 1,
+        duration: 300,
+        delay: reverseIndex * 100, // Stagger animation
+        useNativeDriver: true,
+      });
+    });
+
+    Animated.stagger(50, animations).start(() => {
+      // Clear notifications after animation completes
+      clearAllNotifications();
+      // Reset animations
+      animatedValues.current.forEach(anim => anim.setValue(0));
+    });
+  };
 
 // Komponen Notification Card dengan Ikon
-const NotificationCard = ({ title, value, description, type, isRead, onPress, cardBackground, textColor }) => {
+const NotificationCard = ({ title, value, description, type, isRead, onPress, cardBackground, textColor, timestamp, animatedValue }: NotificationCardProps) => {
+  const animVal = animatedValue || new Animated.Value(0);
   const getIconName = () => {
     switch (type) {
       case 'warning':
@@ -36,13 +89,30 @@ const NotificationCard = ({ title, value, description, type, isRead, onPress, ca
     }
   };
 
+  const translateX = animVal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -400], // Move 400px to the left
+  });
+
+  const opacity = animVal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
   return (
-    <TouchableOpacity onPress={onPress} style={styles.notificationCardTouchable}>
-      <ThemedView style={[
-        styles.notificationCard,
-        !isRead && styles.unreadNotification,
-        { borderLeftColor: getIconColor(), backgroundColor: cardBackground }
-      ]}>
+    <Animated.View
+      style={{
+        transform: [{ translateX }],
+        opacity,
+        marginBottom: 12,
+      }}
+    >
+      <TouchableOpacity onPress={onPress}>
+        <ThemedView style={[
+          styles.notificationCard,
+          !isRead && styles.unreadNotification,
+          { borderLeftColor: getIconColor(), backgroundColor: cardBackground }
+        ]}>
         <View style={styles.notificationHeader}>
           <View style={styles.titleContainer}>
             <Ionicons 
@@ -64,10 +134,11 @@ const NotificationCard = ({ title, value, description, type, isRead, onPress, ca
           {description}
         </ThemedText>
         <ThemedText style={[styles.notificationTime, { color: textColor }] }>
-          2 hours ago
+          {getTimeAgo(timestamp)}
         </ThemedText>
-      </ThemedView>
-    </TouchableOpacity>
+        </ThemedView>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -75,69 +146,34 @@ const NotificationCard = ({ title, value, description, type, isRead, onPress, ca
   const backgroundColor = darkModeEnabled ? '#1a1a1a' : '#f5f5f5';
   const cardBackground = darkModeEnabled ? '#232323' : '#ffffff';
   const textColor = darkModeEnabled ? '#fafafa' : '#232323';
-  // Data notifikasi dengan tipe dan status - memperbaiki ID yang duplikat
-  const notifications = [
-    {
-      id: 1,
-      title: "Pemakaian Listrik",
-      value: "900KWh",
-      description: "Pemakaian listrik anda melebihi batas pemakaian harian.",
-      type: "warning",
-      isRead: false,
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
-    },
-    {
-      id: 2,
-      title: "Listrik Menyala",
-      value: "90",
-      description: "Listrik anda masih menyala saat meninggalkan tempat tinggal.",
-      type: "energy",
-      isRead: true,
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000) // 5 hours ago
-    },
-    {
-      id: 3,
-      title: "Tips Hemat Energi",
-      value: "15%",
-      description: "Anda bisa menghemat hingga 15% dengan mematikan perangkat standby.",
-      type: "info",
-      isRead: true,
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago
-    },
-    {
-      id: 4,
-      title: "Pembayaran Berhasil",
-      value: "Rp 250.000",
-      description: "Pembayaran listrik bulan ini telah berhasil diproses.",
-      type: "info",
-      isRead: true,
-      timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
-    },
-    {
-      id: 5,
-      title: "Penggunaan Puncak",
-      value: "1.2MWh",
-      description: "Penggunaan listrik mencapai puncak pada jam 18:00-20:00.",
-      type: "warning",
-      isRead: false,
-      timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) // 3 days ago
-    }
-  ];
 
-  const handleNotificationPress = (notificationId) => {
+  const handleNotificationPress = (notificationId: unknown) => {
     console.log('Notification pressed:', notificationId);
     // Handle notification press (mark as read, navigate, etc.)
   };
 
-  const unreadCount = notifications.filter(notification => !notification.isRead).length;
+  const getTimeAgo = (timestamp: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - timestamp.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 60) {
+      return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    } else {
+      return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    }
+  };
+
+  const unreadCount = allNotifications.filter(notification => !notification.isRead).length;
 
   return (
     <View style={[styles.mainContainer, { backgroundColor }] }>
       {/* Header dengan jumlah notifikasi belum dibaca - TETAP */}
       <View style={[styles.header, { backgroundColor }] }>
-        <ThemedText type="title" style={[styles.headerTitle, { color: textColor }] }>
-          Notifications
-        </ThemedText>
         {unreadCount > 0 && (
           <View style={styles.badge}>
             <ThemedText style={styles.badgeText}>{unreadCount}</ThemedText>
@@ -152,7 +188,7 @@ const NotificationCard = ({ title, value, description, type, isRead, onPress, ca
         contentContainerStyle={styles.scrollContent}
       >
         {/* Daftar Notifikasi */}
-        {notifications.map((notification) => (
+        {allNotifications.map((notification, index) => (
           <NotificationCard
             key={notification.id}
             title={notification.title}
@@ -163,14 +199,18 @@ const NotificationCard = ({ title, value, description, type, isRead, onPress, ca
             onPress={() => handleNotificationPress(notification.id)}
             cardBackground={cardBackground}
             textColor={textColor}
+            timestamp={notification.timestamp}
+            animatedValue={animatedValues.current[index]}
           />
         ))}
-        
+
         {/* Tombol Clear All - sekarang ikut di-scroll */}
-        {notifications.length > 0 && (
-          <TouchableOpacity style={styles.clearAllButton}>
-            <ThemedText style={styles.clearAllText}>Clear All Notifications</ThemedText>
-          </TouchableOpacity>
+        {allNotifications.length > 0 && (
+          <View style={{ alignItems: 'center', marginTop: 16 }}>
+            <TouchableOpacity style={styles.clearAllButton} onPress={animateClearNotifications}>
+              <Ionicons name="trash" size={24} color="#636161ff" />
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -272,13 +312,16 @@ const styles = StyleSheet.create({
   },
   clearAllButton: {
     alignItems: 'center',
+    width: 48,
+    height: 1,
+    justifyContent: 'center',
     padding: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    marginTop: 1,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 107, 107, 0)',
   },
   clearAllText: {
-    color: '#FF6B6B',
+    color: '#7c7a7aff',
     fontWeight: '600',
   },
 });

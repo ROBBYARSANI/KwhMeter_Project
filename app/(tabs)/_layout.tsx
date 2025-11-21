@@ -1,10 +1,60 @@
+// Simple notifications context
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useState, useContext, createContext } from 'react';
 import { Platform } from 'react-native';
 
+type NotificationType = {
+  id: number;
+  timestamp: Date;
+  isRead: boolean;
+  [key: string]: any; // Allow additional properties
+};
+
+type NotificationsContextType = {
+  notifications: NotificationType[];
+  addNotification: (notification: { [key: string]: any }) => void;
+  markAsRead: (id: number) => void;
+  clearAllNotifications: () => void;
+};
+
+const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
+
+export const useNotifications = () => {
+  const context = useContext(NotificationsContext);
+  if (!context) {
+    throw new Error('useNotifications must be used within NotificationsProvider');
+  }
+  return context;
+};
+
 export default function TabLayout() {
+  const [notifications, setNotifications] = useState<NotificationType[]>([]);
+
+  const addNotification = (notification: { [key: string]: any }) => {
+    const newNotification: NotificationType = {
+      id: Date.now(),
+      ...notification,
+      timestamp: new Date(),
+      isRead: false,
+    };
+    setNotifications(prev => [newNotification, ...prev]);
+  };
+
+  const markAsRead = (id: number) => {
+    setNotifications(prev =>
+      prev.map(notif =>
+        notif.id === id ? { ...notif, isRead: true } : notif
+      )
+    );
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+  };
+
   return (
+    <NotificationsContext.Provider value={{ notifications, addNotification, markAsRead, clearAllNotifications }}>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#4CAF50',
@@ -35,7 +85,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Beranda',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'home' : 'home-outline'} 
@@ -46,22 +96,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="statistics"
-        options={{
-          title: 'Statistics',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'stats-chart' : 'stats-chart-outline'} 
-              color={color} 
-              size={24} 
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="notification"
         options={{
-          title: 'Notification',
+          title: 'Notifikasi',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'notifications' : 'notifications-outline'} 
@@ -74,7 +111,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: 'Pengaturan',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'settings' : 'settings-outline'} 
@@ -85,5 +122,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </NotificationsContext.Provider>
   );
 }
