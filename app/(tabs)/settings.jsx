@@ -6,6 +6,14 @@ import { ScrollView, StyleSheet, Switch, View, TextInput, Platform, TouchableOpa
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
+let BleManager;
+try {
+  const bleModule = require('react-native-ble-plx');
+  BleManager = bleModule.BleManager;
+} catch (e) {
+  BleManager = null;
+}
+
 // Some bundlers / Babel setups can produce a runtime helper interop issue
 // (_interopRequireDefault is not a function). Use a safe require fallback
 // for native modules that may export as CommonJS.
@@ -39,6 +47,11 @@ export default function SettingsScreen() {
 
   // kWh limit
   const [kwhLimit, setKwhLimit] = useState('');
+
+  // WiFi states
+  const [wifiSsid, setWifiSsid] = useState('');
+  const [wifiPassword, setWifiPassword] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // Geofence states
   const [geofenceEnabled, setGeofenceEnabled] = useState(false);
@@ -105,6 +118,71 @@ export default function SettingsScreen() {
     } catch (e) {
       Alert.alert('Error', 'Failed to save geofence');
     }
+  }
+
+  async function sendWiFiToESP32() {
+    if (!wifiSsid || !wifiPassword) {
+      Alert.alert('Error', 'Please enter both SSID and Password');
+      return;
+    }
+
+    if (!BleManager) {
+      Alert.alert('Error', 'BLE not supported on this device');
+      return;
+    }
+
+  setIsConnecting(true);
+  let manager;
+  try {
+    manager = new BleManager();
+  } catch (error) {
+    console.error('BLE initialization error:', error);
+    Alert.alert('Error', 'BLE not properly initialized. Please use a development build (not Expo Go) for BLE functionality.');
+    setIsConnecting(false);
+    return;
+  }
+
+  const deviceId = 'ESP32test'; // Assume this is the device name or use scan
+  const scanTimeout = setTimeout(() => {
+    manager.stopDeviceScan();
+    setIsConnecting(false);
+    Alert.alert('Scan timeout', 'No ESP32 device found within 10 seconds');
+  }, 10000);
+
+  manager.startDeviceScan(null, null, (error, device) => {
+    if (error) {
+      console.error('Scan error:', error);
+      clearTimeout(scanTimeout);
+      setIsConnecting(false);
+      Alert.alert('Scan Error', error.message);
+      return;
+    }
+
+    if (device.name === 'ESP32-WiFi' || device.id === deviceId) {
+      manager.stopDeviceScan();
+      clearTimeout(scanTimeout);
+      manager.connectToDevice(device.id).then(async connectedDevice => {
+        console.log('Connected to ESP32');
+
+        // Assume UUIDs (replace with actual)
+        const serviceUUID = '12345678-1234-1234-1234-123456789ABC';
+        const ssidCharUUID = '12345678-1234-1234-1234-876543210001';
+        const passwordCharUUID = '12345678-1234-1234-1234-876543210002';
+
+        await connectedDevice.discoverAllServicesAndCharacteristics();
+        await connectedDevice.writeCharacteristicWithResponseForService(serviceUUID, ssidCharUUID, wifiSsid, 'utf8');
+        await connectedDevice.writeCharacteristicWithResponseForService(serviceUUID, passwordCharUUID, wifiPassword, 'utf8');
+
+        manager.disconnectDevice(device.id);
+        setIsConnecting(false);
+        Alert.alert('Success', 'WiFi credentials sent to ESP32');
+      }).catch(err => {
+        console.error('Connection error:', err);
+        setIsConnecting(false);
+        Alert.alert('Connection Error', 'Failed to connect to ESP32: ' + err.message);
+      });
+    }
+  });
   }
 
   return (
@@ -196,6 +274,46 @@ export default function SettingsScreen() {
           </ThemedView>
         </ThemedView>
 
+        <ThemedView style={[styles.section, { backgroundColor: sectionBackgroundColor }]}>
+          <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Konfigurasi WiFi ESP32</ThemedText>
+          <View style={styles.wifiContainer}>
+            <ThemedText style={[styles.settingText, { color: settingTextColor, marginBottom: 8 }]}>Nama WiFi (SSID)</ThemedText>
+            <TextInput
+              style={[styles.input, {
+                backgroundColor: darkModeEnabled ? '#333' : '#f5f5f5',
+                color: settingTextColor,
+                borderColor: '#4CAF50'
+              }]}
+              value={wifiSsid}
+              onChangeText={setWifiSsid}
+              placeholder="Enter WiFi SSID"
+              placeholderTextColor={darkModeEnabled ? '#888' : '#aaa'}
+            />
+            <ThemedText style={[styles.settingText, { color: settingTextColor, marginTop: 12, marginBottom: 8 }]}>Password WiFi</ThemedText>
+            <TextInput
+              style={[styles.input, {
+                backgroundColor: darkModeEnabled ? '#333' : '#f5f5f5',
+                color: settingTextColor,
+                borderColor: '#4CAF50'
+              }]}
+              value={wifiPassword}
+              onChangeText={setWifiPassword}
+              placeholder="Enter WiFi Password"
+              placeholderTextColor={darkModeEnabled ? '#888' : '#aaa'}
+              secureTextEntry
+            />
+            <TouchableOpacity
+              style={[styles.button, isConnecting && styles.buttonDisabled]}
+              onPress={sendWiFiToESP32}
+              disabled={isConnecting}
+            >
+              <ThemedText style={styles.buttonText}>
+                {isConnecting ? 'Menghubungkan...' : 'Kirim ke ESP32 via BLE'}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </ThemedView>
+
         <ThemedView style={[styles.section, { backgroundColor: sectionBackgroundColor }]}> 
           <ThemedText style={[styles.sectionTitle, { color: sectionTitleColor }]}>Preferensi</ThemedText>
           <ThemedView style={[styles.settingItem, { backgroundColor: settingItemBackgroundColor }]}> 
@@ -228,5 +346,31 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     fontSize: 14,
     fontWeight: '500',
+  },
+  wifiContainer: {
+    width: '100%',
+  },
+  input: {
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 2,
+    minWidth: '100%',
+    fontSize: 16,
+  },
+  button: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#888',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
