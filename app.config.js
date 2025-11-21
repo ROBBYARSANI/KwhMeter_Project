@@ -28,7 +28,7 @@ module.exports = {
       package: 'com.robbyarsani.KWhApp',
       config: {
         googleMaps: {
-          apiKey: 'YOUR_GOOGLE_MAPS_API_KEY'
+          apiKey: process.env.GOOGLE_MAPS_API_KEY || 'YOUR_GOOGLE_MAPS_API_KEY'
         }
       }
     },

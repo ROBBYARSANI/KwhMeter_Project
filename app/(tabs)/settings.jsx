@@ -137,8 +137,16 @@ export default function SettingsScreen() {
                   </MapView>
                 ) : (
                   <View style={{ flex: 1, backgroundColor: '#f0f0f0', borderRadius: 8, padding: 16, justifyContent: 'center', alignItems: 'center' }}>
-                    <ThemedText style={{ textAlign: 'center' }}>Map view is not available on web.{'\n'}Please use the mobile app for full geofencing features.</ThemedText>
-                    <ThemedText style={{ marginTop: 12, color: '#777', textAlign: 'center' }}>If you're testing in Expo Go, note that react-native-maps may not be available — use a development build (EAS) or run on a simulator with the native module installed.</ThemedText>
+                    <ThemedText style={{ textAlign: 'center' }}>
+                      {Platform.OS === 'web'
+                        ? 'Map view is not available on web.\nPlease use the mobile app for full geofencing features.'
+                        : 'Map view failed to load.\nEnsure Google Maps API key is configured in app.config.js and AndroidManifest.xml for Android builds.'}
+                    </ThemedText>
+                    {Platform.OS === 'web' && (
+                      <ThemedText style={{ marginTop: 12, color: '#777', textAlign: 'center' }}>
+                        If you're testing in Expo Go, note that react-native-maps may not be available — use a development build (EAS) or run on a simulator with the native module installed.
+                      </ThemedText>
+                    )}
                     {marker && (
                       <View style={{ marginTop: 16 }}>
                         <ThemedText>Selected Location:</ThemedText>
