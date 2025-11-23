@@ -65,6 +65,26 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadStoredData();
     checkBluetoothStatus();
+
+    // Set up Bluetooth state change listeners
+    let enabledListener = null;
+    let disabledListener = null;
+
+    if (isBluetoothAvailable && BluetoothSerial && BluetoothSerial.on) {
+      enabledListener = BluetoothSerial.on('bluetoothEnabled', () => {
+        setBluetoothStatus('Bluetooth ON');
+      });
+
+      disabledListener = BluetoothSerial.on('bluetoothDisabled', () => {
+        setBluetoothStatus('Bluetooth OFF');
+      });
+    }
+
+    // Cleanup listeners on unmount
+    return () => {
+      if (enabledListener) enabledListener.remove();
+      if (disabledListener) disabledListener.remove();
+    };
   }, []);
 
   async function loadStoredData() {
