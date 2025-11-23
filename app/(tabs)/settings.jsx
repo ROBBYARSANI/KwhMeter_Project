@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useEffect, useState } from 'react';
 import { useThemeMode } from '../../components/theme-context';
-import { ScrollView, StyleSheet, Switch, View, TextInput, Platform, TouchableOpacity, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Switch, View, TextInput, Platform, TouchableOpacity, Alert, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
@@ -66,7 +66,7 @@ export default function SettingsScreen() {
     loadStoredData();
     checkBluetoothStatus();
 
-    // Set up Bluetooth state change listeners
+    // Set up Bluetooth state change listeners using library events
     let enabledListener = null;
     let disabledListener = null;
 
@@ -80,10 +80,35 @@ export default function SettingsScreen() {
       });
     }
 
-    // Cleanup listeners on unmount
+    // Set up DeviceEventEmitter listener as fallback for Android system events
+    let deviceEventListener = null;
+    if (DeviceEventEmitter) {
+      deviceEventListener = DeviceEventEmitter.addListener('BLUETOOTH_STATE_CHANGE', (event) => {
+        console.log('DeviceEventEmitter BLUETOOTH_STATE_CHANGE:', event);
+        if (event && event.state) {
+          const state = event.state.toUpperCase();
+          if (state === 'ON' || state === 'TURNED_ON') {
+            setBluetoothStatus('Bluetooth ON');
+          } else if (state === 'OFF' || state === 'TURNED_OFF') {
+            setBluetoothStatus('Bluetooth OFF');
+          }
+        } else if (event && event.enabled !== undefined) {
+          setBluetoothStatus(event.enabled ? 'Bluetooth ON' : 'Bluetooth OFF');
+        }
+      });
+    }
+
+    // Polling fallback to check status periodically
+    const interval = setInterval(async () => {
+      await checkBluetoothStatus();
+    }, 10000); // Check every 10 seconds
+
+    // Cleanup listeners and interval on unmount
     return () => {
+      clearInterval(interval);
       if (enabledListener) enabledListener.remove();
       if (disabledListener) disabledListener.remove();
+      if (deviceEventListener) deviceEventListener.remove();
     };
   }, []);
 
@@ -105,10 +130,10 @@ export default function SettingsScreen() {
   // Cek status Bluetooth tanpa permission location
   async function checkBluetoothStatus() {
     if (!isBluetoothAvailable) return;
-    
+
     try {
       let enabled = false;
-      
+
       // Coba berbagai method untuk cek status Bluetooth
       if (BluetoothSerial.isEnabled) {
         enabled = await BluetoothSerial.isEnabled();
@@ -118,7 +143,7 @@ export default function SettingsScreen() {
         const state = await BluetoothSerial.getBluetoothState();
         enabled = state === 'enabled' || state === 'powered_on';
       }
-      
+
       setBluetoothStatus(enabled ? 'Bluetooth ON' : 'Bluetooth OFF');
       return enabled;
     } catch (error) {
