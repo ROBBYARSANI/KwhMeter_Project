@@ -6,12 +6,11 @@ import { ScrollView, StyleSheet, Switch, View, TextInput, Platform, TouchableOpa
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
-let BleManager;
+let BluetoothSerial;
 try {
-  const bleModule = require('react-native-ble-plx');
-  BleManager = bleModule.BleManager;
+  BluetoothSerial = require('react-native-bluetooth-serial').default;
 } catch (e) {
-  BleManager = null;
+  BluetoothSerial = null;
 }
 
 // Some bundlers / Babel setups can produce a runtime helper interop issue
@@ -126,63 +125,63 @@ export default function SettingsScreen() {
       return;
     }
 
-    if (!BleManager) {
-      Alert.alert('Error', 'BLE not supported on this device');
+    if (!BluetoothSerial) {
+      Alert.alert('Error', 'Bluetooth Serial not supported on this device');
       return;
     }
 
-  setIsConnecting(true);
-  let manager;
-  try {
-    manager = new BleManager();
-  } catch (error) {
-    console.error('BLE initialization error:', error);
-    Alert.alert('Error', 'BLE not properly initialized. Please use a development build (not Expo Go) for BLE functionality.');
-    setIsConnecting(false);
-    return;
-  }
+    setIsConnecting(true);
 
-  const deviceId = 'ESP32test'; // Assume this is the device name or use scan
-  const scanTimeout = setTimeout(() => {
-    manager.stopDeviceScan();
-    setIsConnecting(false);
-    Alert.alert('Scan timeout', 'No ESP32 device found within 10 seconds');
-  }, 10000);
-
-  manager.startDeviceScan(null, null, (error, device) => {
-    if (error) {
-      console.error('Scan error:', error);
-      clearTimeout(scanTimeout);
-      setIsConnecting(false);
-      Alert.alert('Scan Error', error.message);
-      return;
-    }
-
-    if (device.name === 'ESP32-WiFi' || device.id === deviceId) {
-      manager.stopDeviceScan();
-      clearTimeout(scanTimeout);
-      manager.connectToDevice(device.id).then(async connectedDevice => {
-        console.log('Connected to ESP32');
-
-        // Assume UUIDs (replace with actual)
-        const serviceUUID = '12345678-1234-1234-1234-123456789ABC';
-        const ssidCharUUID = '12345678-1234-1234-1234-876543210001';
-        const passwordCharUUID = '12345678-1234-1234-1234-876543210002';
-
-        await connectedDevice.discoverAllServicesAndCharacteristics();
-        await connectedDevice.writeCharacteristicWithResponseForService(serviceUUID, ssidCharUUID, wifiSsid, 'utf8');
-        await connectedDevice.writeCharacteristicWithResponseForService(serviceUUID, passwordCharUUID, wifiPassword, 'utf8');
-
-        manager.disconnectDevice(device.id);
+    try {
+      // Check if Bluetooth is enabled
+      const enabled = await BluetoothSerial.isEnabled();
+      if (!enabled) {
+        Alert.alert('Bluetooth Disabled', 'Please enable Bluetooth first');
         setIsConnecting(false);
-        Alert.alert('Success', 'WiFi credentials sent to ESP32');
-      }).catch(err => {
-        console.error('Connection error:', err);
+        return;
+      }
+
+      // List paired devices
+      const devices = await BluetoothSerial.list();
+      console.log('Paired devices:', devices);
+
+      // Look for ESP32 device (primary: ESP32_Classic)
+      const esp32Device = devices.find(device =>
+        device.name && (device.name === 'ESP32_Classic' || device.name.includes('ESP32') || device.name.includes('WiFi'))
+      );
+
+      if (!esp32Device) {
         setIsConnecting(false);
-        Alert.alert('Connection Error', 'Failed to connect to ESP32: ' + err.message);
+        Alert.alert('Device not found', 'No ESP32 device found in paired devices. Please pair your ESP32 device first.');
+        return;
+      }
+
+      console.log('Connecting to ESP32:', esp32Device.name);
+
+      // Connect to the device
+      await BluetoothSerial.connect(esp32Device.id);
+      console.log('Connected to ESP32');
+
+      // Send WiFi credentials as JSON
+      const wifiData = JSON.stringify({
+        ssid: wifiSsid,
+        password: wifiPassword
       });
+
+      await BluetoothSerial.write(wifiData);
+      console.log('WiFi data sent:', wifiData);
+
+      // Disconnect after sending
+      await BluetoothSerial.disconnect();
+
+      setIsConnecting(false);
+      Alert.alert('Success', 'WiFi credentials sent to ESP32 via Bluetooth Serial');
+
+    } catch (error) {
+      console.error('Bluetooth Serial error:', error);
+      setIsConnecting(false);
+      Alert.alert('Connection Error', 'Failed to connect to ESP32: ' + error.message);
     }
-  });
   }
 
   return (
@@ -308,7 +307,7 @@ export default function SettingsScreen() {
               disabled={isConnecting}
             >
               <ThemedText style={styles.buttonText}>
-                {isConnecting ? 'Menghubungkan...' : 'Kirim ke ESP32 via BLE'}
+                {isConnecting ? 'Menghubungkan...' : 'Kirim ke ESP32 via Bluetooth Serial'}
               </ThemedText>
             </TouchableOpacity>
           </View>
