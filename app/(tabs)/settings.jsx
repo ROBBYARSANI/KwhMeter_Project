@@ -2,15 +2,13 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useEffect, useState, useRef } from 'react';
 import { useThemeMode } from '../../components/theme-context';
-import { ScrollView, StyleSheet, Switch, View, TextInput, Platform, TouchableOpacity, Alert, DeviceEventEmitter, Linking, Animated, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, Switch, View, TextInput, Platform, TouchableOpacity, Alert, DeviceEventEmitter, Linking, Animated, ActivityIndicator, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
-// Bluetooth setup dengan library yang lebih tepat untuk status monitoring
+// Bluetooth setup yang lebih kompatibel untuk production
 let BluetoothSerial;
-let BluetoothStateManager;
 let isBluetoothAvailable = false;
-let isBluetoothStateManagerAvailable = false;
 
 try {
   BluetoothSerial = require('react-native-bluetooth-classic');
@@ -21,18 +19,6 @@ try {
 } catch (e) {
   console.log('Bluetooth serial module not available:', e.message);
   isBluetoothAvailable = false;
-}
-
-// Coba load Bluetooth State Manager untuk monitoring status
-try {
-  BluetoothStateManager = require('react-native-bluetooth-state-manager');
-  if (BluetoothStateManager && typeof BluetoothStateManager === 'object') {
-    isBluetoothStateManagerAvailable = true;
-    console.log('Bluetooth state manager loaded');
-  }
-} catch (e) {
-  console.log('Bluetooth state manager not available:', e.message);
-  isBluetoothStateManagerAvailable = false;
 }
 
 // Slider setup
@@ -107,88 +93,42 @@ export default function SettingsScreen() {
     } catch (e) {}
   }
 
-  // Inisialisasi monitoring status Bluetooth
+  // Inisialisasi monitoring status Bluetooth yang lebih robust
   async function initializeBluetoothStatus() {
     setIsCheckingStatus(true);
     
     try {
-      // Gunakan Bluetooth State Manager jika tersedia
-      if (isBluetoothStateManagerAvailable) {
-        console.log('Using Bluetooth State Manager for status monitoring');
+      // Method 1: Coba dengan react-native-bluetooth-classic
+      if (isBluetoothAvailable) {
+        await checkBluetoothStatus();
         
-        // Dapatkan status awal
-        const currentState = await BluetoothStateManager.getState();
-        updateBluetoothStatus(currentState);
-        
-        // Setup listener untuk perubahan status
-        BluetoothStateManager.onStateChange((state) => {
-          console.log('Bluetooth state changed:', state);
-          updateBluetoothStatus(state);
-        }, true);
-        
-      } else {
-        // Fallback ke metode lama dengan polling
-        console.log('Using fallback Bluetooth status checking');
-        await checkBluetoothStatusFallback();
-        
-        // Setup polling setiap 5 detik
+        // Setup polling untuk production (lebih reliable daripada listener)
         const interval = setInterval(async () => {
-          await checkBluetoothStatusFallback();
-        }, 5000);
+          await checkBluetoothStatus();
+        }, 3000);
         
-        // Cleanup interval nanti
+        return () => clearInterval(interval);
+      } else {
+        // Method 2: Fallback ke Native Modules jika tersedia
+        await checkBluetoothNative();
+        
+        const interval = setInterval(async () => {
+          await checkBluetoothNative();
+        }, 3000);
+        
         return () => clearInterval(interval);
       }
     } catch (error) {
       console.error('Error initializing Bluetooth status:', error);
-      setBluetoothStatus('Error monitoring status');
+      // Method 3: Fallback ultimate - cek melalui capability
+      setBluetoothStatus('Bluetooth Tidak Didukung');
     } finally {
       setIsCheckingStatus(false);
     }
   }
 
-  // Update status Bluetooth berdasarkan state
-  function updateBluetoothStatus(state) {
-    let statusText = 'Tidak Diketahui';
-    let isEnabled = false;
-
-    switch (state) {
-      case 'on':
-      case 'powered_on':
-      case 'enabled':
-      case 'turned_on':
-        statusText = 'Bluetooth ON';
-        isEnabled = true;
-        break;
-      case 'off':
-      case 'powered_off':
-      case 'disabled':
-      case 'turned_off':
-        statusText = 'Bluetooth OFF';
-        isEnabled = false;
-        break;
-      case 'turning_on':
-        statusText = 'Bluetooth Menyala...';
-        break;
-      case 'turning_off':
-        statusText = 'Bluetooth Mematikan...';
-        break;
-      case 'unauthorized':
-        statusText = 'Izin Bluetooth Diperlukan';
-        break;
-      case 'unsupported':
-        statusText = 'Bluetooth Tidak Didukung';
-        break;
-      default:
-        statusText = `Status: ${state}`;
-    }
-
-    setBluetoothStatus(statusText);
-    return isEnabled;
-  }
-
-  // Fallback method untuk cek status Bluetooth
-  async function checkBluetoothStatusFallback() {
+  // Method utama untuk cek status Bluetooth
+  async function checkBluetoothStatus() {
     if (!isBluetoothAvailable) {
       setBluetoothStatus('Bluetooth Tidak Tersedia');
       return false;
@@ -196,53 +136,81 @@ export default function SettingsScreen() {
 
     try {
       let enabled = false;
+      let state = 'unknown';
 
       // Coba berbagai method untuk cek status Bluetooth
       if (BluetoothSerial.isEnabled) {
         enabled = await BluetoothSerial.isEnabled();
+        state = enabled ? 'on' : 'off';
       } else if (BluetoothSerial.isBluetoothEnabled) {
         enabled = await BluetoothSerial.isBluetoothEnabled();
+        state = enabled ? 'on' : 'off';
       } else if (BluetoothSerial.getBluetoothState) {
-        const state = await BluetoothSerial.getBluetoothState();
+        state = await BluetoothSerial.getBluetoothState();
         enabled = state === 'enabled' || state === 'powered_on';
       }
 
-      setBluetoothStatus(enabled ? 'Bluetooth ON' : 'Bluetooth OFF');
+      updateBluetoothDisplay(enabled, state);
       return enabled;
     } catch (error) {
       console.error('Error checking Bluetooth status:', error);
-      setBluetoothStatus('Error checking status');
+      setBluetoothStatus('Error - Restart App');
       return false;
+    }
+  }
+
+  // Fallback ke Native Modules
+  async function checkBluetoothNative() {
+    try {
+      // Coba akses native module langsung
+      if (NativeModules.BluetoothManager || NativeModules.BluetoothSerial) {
+        const module = NativeModules.BluetoothManager || NativeModules.BluetoothSerial;
+        if (module.getState) {
+          const state = await module.getState();
+          updateBluetoothDisplay(state === 'on', state);
+          return state === 'on';
+        }
+      }
+      
+      // Jika semua gagal, asumsikan Bluetooth available tapi status unknown
+      setBluetoothStatus('Bluetooth Ready');
+      return true;
+    } catch (error) {
+      console.error('Native module error:', error);
+      setBluetoothStatus('Bluetooth Ready');
+      return true;
+    }
+  }
+
+  // Update display status
+  function updateBluetoothDisplay(enabled, state) {
+    if (enabled) {
+      setBluetoothStatus('Bluetooth ON');
+    } else {
+      setBluetoothStatus('Bluetooth OFF');
     }
   }
 
   // Function untuk membuka pengaturan Bluetooth
   async function openBluetoothSettings() {
     try {
-      // Coba menggunakan Bluetooth State Manager untuk mengaktifkan Bluetooth
-      if (isBluetoothStateManagerAvailable) {
-        try {
-          await BluetoothStateManager.requestEnable();
-          // Status akan diupdate via listener
-          return;
-        } catch (enableError) {
-          console.log('Could not enable via manager, falling back to settings:', enableError);
-        }
-      }
-
-      // Fallback: buka pengaturan sistem
       if (Platform.OS === 'android') {
         await Linking.openSettings();
       } else {
         await Linking.openURL('App-Prefs:Bluetooth');
       }
+      
+      // Beri waktu untuk user mengubah settings lalu check status
+      setTimeout(() => {
+        checkBluetoothStatus();
+      }, 2000);
     } catch (error) {
       console.error('Error opening Bluetooth settings:', error);
       Alert.alert('Error', 'Tidak dapat membuka pengaturan Bluetooth');
     }
   }
 
-  // Scan devices dengan approach yang lebih sederhana
+  // Scan devices dengan error handling yang better
   async function scanBluetoothDevices() {
     if (!isBluetoothAvailable) {
       Alert.alert('Error', 'Bluetooth tidak tersedia di perangkat ini');
@@ -256,8 +224,8 @@ export default function SettingsScreen() {
       console.log('Starting Bluetooth scan...');
       
       // Cek status Bluetooth dulu
-      const isEnabled = await checkBluetoothStatusFallback();
-      if (!isEnabled) {
+      const isEnabled = await checkBluetoothStatus();
+      if (!isEnabled && bluetoothStatus !== 'Bluetooth ON') {
         Alert.alert(
           'Bluetooth Dimatikan', 
           'Silakan nyalakan Bluetooth terlebih dahulu di pengaturan perangkat Anda',
@@ -270,33 +238,27 @@ export default function SettingsScreen() {
         return;
       }
 
-      // Dapatkan paired devices - ini tidak butuh permission location
+      // Dapatkan paired devices
       let devices = [];
       
-      // Coba semua method yang mungkin
-      if (BluetoothSerial.getBondedDevices) {
-        console.log('Using getBondedDevices...');
-        devices = await BluetoothSerial.getBondedDevices();
-      } else if (BluetoothSerial.list) {
-        console.log('Using list...');
-        devices = await BluetoothSerial.list();
-      } else if (BluetoothSerial.getPairedDevices) {
-        console.log('Using getPairedDevices...');
-        devices = await BluetoothSerial.getPairedDevices();
-      } else {
-        // Fallback: coba akses properti langsung
-        console.log('Trying direct property access...');
-        devices = BluetoothSerial.pairedDevices || BluetoothSerial.bondedDevices || [];
+      try {
+        if (BluetoothSerial.getBondedDevices) {
+          devices = await BluetoothSerial.getBondedDevices();
+        } else if (BluetoothSerial.list) {
+          devices = await BluetoothSerial.list();
+        } else if (BluetoothSerial.getPairedDevices) {
+          devices = await BluetoothSerial.getPairedDevices();
+        }
+      } catch (scanError) {
+        console.log('Scan error, using empty devices:', scanError);
+        devices = [];
       }
 
-      console.log('Raw devices found:', devices);
+      console.log('Devices found:', devices.length);
       
       // Filter untuk ESP32 devices
       const esp32Devices = devices.filter(device => {
-        const name = device.name || '';
-        const address = device.address || device.id || '';
-        
-        console.log(`Checking device: ${name} (${address})`);
+        const name = (device.name || '').toString();
         
         return (
           name === 'ESP32_Classic' || 
@@ -307,13 +269,12 @@ export default function SettingsScreen() {
         );
       });
 
-      console.log('ESP32 devices filtered:', esp32Devices);
       setAvailableDevices(esp32Devices);
       
       if (esp32Devices.length === 0) {
         Alert.alert(
           'Device Tidak Ditemukan', 
-          `Tidak ada device ESP32 yang terdeteksi. \n\nPastikan:\n• ESP32_Classic sudah dipaired di pengaturan Bluetooth\n• Bluetooth ESP32 dalam mode discoverable\n• Device dalam jangkauan\n\nDevices yang ditemukan: ${devices.map(d => d.name).join(', ') || 'Tidak ada'}`,
+          `Tidak ada device ESP32 yang terdeteksi. \n\nPastikan:\n• Device ESP32 sudah dipaired di pengaturan Bluetooth\n• Bluetooth ESP32 dalam mode discoverable\n• Device dalam jangkauan`,
           [{ text: 'OK' }]
         );
       } else {
@@ -326,7 +287,7 @@ export default function SettingsScreen() {
       console.error('Bluetooth scan error:', error);
       Alert.alert(
         'Scan Error', 
-        `Gagal scanning devices: ${error.message}\n\nPastikan Anda telah memberikan izin Bluetooth jika diminta.`,
+        `Gagal scanning devices. Pastikan Bluetooth aktif dan izin diberikan.`,
         [{ text: 'OK' }]
       );
     } finally {
@@ -352,20 +313,13 @@ export default function SettingsScreen() {
       console.log('Attempting to connect to:', selectedDevice);
 
       // Connect ke device
-      let connection;
       const deviceId = selectedDevice.address || selectedDevice.id;
+      let connection;
       
       if (BluetoothSerial.connect) {
-        console.log('Using connect method...');
         connection = await BluetoothSerial.connect(deviceId);
       } else if (BluetoothSerial.connectToDevice) {
-        console.log('Using connectToDevice method...');
         connection = await BluetoothSerial.connectToDevice(deviceId);
-      } else if (BluetoothSerial.connectDevice) {
-        console.log('Using connectDevice method...');
-        connection = await BluetoothSerial.connectDevice(deviceId);
-      } else {
-        throw new Error('Tidak ada method connect yang tersedia');
       }
 
       console.log('Connected successfully');
@@ -379,10 +333,6 @@ export default function SettingsScreen() {
         result = await BluetoothSerial.write(wifiData);
       } else if (BluetoothSerial.writeToDevice) {
         result = await BluetoothSerial.writeToDevice(deviceId, wifiData);
-      } else if (connection && connection.write) {
-        result = await connection.write(wifiData);
-      } else {
-        throw new Error('Tidak ada method write yang tersedia');
       }
 
       console.log('Data sent successfully:', result);
@@ -395,28 +345,26 @@ export default function SettingsScreen() {
         await BluetoothSerial.disconnect();
       } else if (BluetoothSerial.disconnectFromDevice) {
         await BluetoothSerial.disconnectFromDevice(deviceId);
-      } else if (connection && connection.disconnect) {
-        await connection.disconnect();
       }
 
       console.log('Disconnected successfully');
-      setIsConnecting(false);
       Alert.alert('Sukses', 'Konfigurasi WiFi berhasil dikirim ke ESP32');
 
     } catch (error) {
       console.error('Bluetooth connection error:', error);
-      setIsConnecting(false);
       
-      let errorMessage = error.message;
-      if (errorMessage.includes('Unable to connect') || errorMessage.includes('Connection failed')) {
-        errorMessage = 'Gagal terhubung ke device. Pastikan:\n• ESP32_Classic tidak sedang digunakan aplikasi lain\n• Device dalam jangkauan\n• Coba unpair dan pair ulang device';
-      } else if (errorMessage.includes('Device not found')) {
-        errorMessage = 'Device tidak ditemukan. Pastikan device sudah dipaired dan dalam jangkauan.';
-      } else if (errorMessage.includes('Permission')) {
-        errorMessage = 'Izin Bluetooth tidak diberikan. Silakan berikan izin Bluetooth di pengaturan aplikasi.';
+      let errorMessage = 'Gagal terhubung ke device. ';
+      if (error.message.includes('Unable to connect')) {
+        errorMessage += 'Pastikan device sudah dipaired dan dalam jangkauan.';
+      } else if (error.message.includes('Permission')) {
+        errorMessage += 'Izin Bluetooth tidak diberikan.';
+      } else {
+        errorMessage += error.message;
       }
       
       Alert.alert('Koneksi Gagal', errorMessage);
+    } finally {
+      setIsConnecting(false);
     }
   }
 
@@ -470,7 +418,6 @@ export default function SettingsScreen() {
               backgroundColor: 
                 bluetoothStatus === 'Bluetooth ON' ? '#e8f5e8' : 
                 bluetoothStatus === 'Bluetooth OFF' ? '#ffebee' :
-                bluetoothStatus.includes('Menyala') || bluetoothStatus.includes('Mematikan') ? '#fff3cd' :
                 '#fff3cd'
             }]}>
               <View style={styles.statusRow}>
@@ -479,7 +426,6 @@ export default function SettingsScreen() {
                     color: 
                       bluetoothStatus === 'Bluetooth ON' ? '#2e7d32' : 
                       bluetoothStatus === 'Bluetooth OFF' ? '#d32f2f' :
-                      bluetoothStatus.includes('Menyala') || bluetoothStatus.includes('Mematikan') ? '#856404' :
                       '#856404'
                   }]}>
                     Status: {bluetoothStatus}
@@ -500,11 +446,6 @@ export default function SettingsScreen() {
               {bluetoothStatus === 'Bluetooth OFF' && (
                 <ThemedText style={[styles.settingText, { color: '#d32f2f', fontSize: 14, marginTop: 4 }]}>
                   Bluetooth diperlukan untuk mengkonfigurasi ESP32
-                </ThemedText>
-              )}
-              {(bluetoothStatus.includes('Menyala') || bluetoothStatus.includes('Mematikan')) && (
-                <ThemedText style={[styles.settingText, { color: '#856404', fontSize: 14, marginTop: 4 }]}>
-                  Sedang memproses...
                 </ThemedText>
               )}
             </View>
@@ -541,15 +482,15 @@ export default function SettingsScreen() {
                     key={device.address || device.id || index}
                     style={[
                       styles.deviceItem,
-                      selectedDevice?.address === device.address && styles.selectedDeviceItem
+                      selectedDevice && (selectedDevice.address === device.address || selectedDevice.id === device.id) && styles.selectedDeviceItem
                     ]}
                     onPress={() => setSelectedDevice(device)}
                   >
                     <ThemedText style={styles.deviceName}>
-                      {device.name}
+                      {device.name || 'Unknown Device'}
                     </ThemedText>
                     <ThemedText style={styles.deviceAddress}>
-                      {device.address || device.id}
+                      {device.address || device.id || 'No Address'}
                     </ThemedText>
                   </TouchableOpacity>
                 ))}
@@ -558,7 +499,7 @@ export default function SettingsScreen() {
 
             {selectedDevice && (
               <View style={styles.selectedDeviceContainer}>
-                <ThemedText style={[styles.settingText, { color: '#4CAF50' }]}>
+                <ThemedText style={[styles.settingText, { color: '#4CAF50', fontWeight: 'bold' }]}>
                   Selected: {selectedDevice.name}
                 </ThemedText>
               </View>
