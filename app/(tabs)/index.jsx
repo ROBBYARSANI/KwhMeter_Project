@@ -6,6 +6,9 @@ import { useThemeMode } from '../../components/theme-context';
 import { useNotifications } from './_layout';
 import { ScrollView, StatusBar, StyleSheet, TouchableOpacity, View, Platform, Alert, Vibration, TextInput } from 'react-native';
 import { useMaxKwh } from '../../hooks/use-max-kwh';
+import { startGeofencingMonitoring, stopGeofencingMonitoring } from '../../services/geofencingService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 const PowerUsageCard = ({ cardBackground, textColor, powerUsage, maxKwh }) => {
   const percent = Math.min(100, Math.round((powerUsage / maxKwh) * 100));
@@ -117,6 +120,51 @@ export default function HomeScreen() {
         .catch(() => {});
     }, 2000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Initialize geofencing and notifications
+  useEffect(() => {
+    const initializeAppFeatures = async () => {
+      try {
+        const Notifications = Constants.appOwnership !== 'expo' ? await import('expo-notifications').then(m => m.default) : null;
+
+        if (Notifications) {
+          // Request notification permissions
+          const { status: notificationPerm } = await Notifications.requestPermissionsAsync();
+          console.log('Notification permissions:', notificationPerm);
+
+          // Set notification handler
+          Notifications.setNotificationHandler({
+            handleNotification: async () => ({
+              shouldShowAlert: true,
+              shouldPlaySound: true,
+              shouldSetBadge: false,
+            }),
+          });
+        } else {
+          console.log('Running in Expo Go, push notifications not supported for power alerts');
+        }
+
+        // Initialize geofencing if geofence is configured
+        const geofenceData = await AsyncStorage.getItem('geofence');
+        if (geofenceData) {
+          const geofence = JSON.parse(geofenceData);
+          if (geofence.coordinate && geofence.radius) {
+            await startGeofencingMonitoring();
+            console.log('Geofencing monitoring started');
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing app features:', error);
+      }
+    };
+
+    initializeAppFeatures();
+
+    // Cleanup function
+    return () => {
+      stopGeofencingMonitoring();
+    };
   }, []);
 
   useEffect(() => {

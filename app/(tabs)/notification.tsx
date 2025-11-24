@@ -2,11 +2,22 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Animated, LayoutAnimation, UIManager, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeMode } from '../../components/theme-context';
 import { useNotifications } from './_layout';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+
+type NotificationType = {
+  id: number;
+  timestamp: Date;
+  isRead: boolean;
+  title: string;
+  value?: string;
+  description: string;
+  type: string;
+};
 
 interface NotificationCardProps {
   title: string;
@@ -23,8 +34,65 @@ interface NotificationCardProps {
 
 export default function NotificationScreen() {
   const { notifications, markAsRead, clearAllNotifications } = useNotifications();
+  const [geofenceNotifications, setGeofenceNotifications] = useState<NotificationType[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const allNotifications = [...notifications];
+  // Load geofence notifications from AsyncStorage
+  useEffect(() => {
+    const loadGeofenceNotifications = async () => {
+      try {
+        const storedNotifications = await AsyncStorage.getItem('geofence_notifications');
+        if (storedNotifications) {
+          const parsed = JSON.parse(storedNotifications);
+          setGeofenceNotifications(parsed.map((notif: any) => ({
+            id: notif.id,
+            timestamp: new Date(notif.timestamp),
+            isRead: notif.isRead,
+            title: notif.title,
+            value: notif.value || '',
+            description: notif.description,
+            type: notif.type,
+          })));
+        }
+      } catch (error) {
+        console.error('Error loading geofence notifications:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadGeofenceNotifications();
+  }, []);
+
+  // Update geofence notifications when they change (for real-time updates)
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const storedNotifications = await AsyncStorage.getItem('geofence_notifications');
+        if (storedNotifications) {
+          const parsed = JSON.parse(storedNotifications);
+          setGeofenceNotifications(parsed.map((notif: any) => ({
+            id: notif.id,
+            timestamp: new Date(notif.timestamp),
+            isRead: notif.isRead,
+            title: notif.title,
+            value: notif.value || '',
+            description: notif.description,
+            type: notif.type,
+          })));
+        }
+      } catch (error) {
+        console.error('Error updating geofence notifications:', error);
+      }
+    };
+
+    // Check for updates every 5 seconds
+    const interval = setInterval(checkForUpdates, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Combine regular notifications with geofence notifications
+  const allNotifications = [...notifications, ...geofenceNotifications].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   // Animation setup
   if (Platform.OS === 'android') {
