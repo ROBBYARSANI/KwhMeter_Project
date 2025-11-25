@@ -22,7 +22,7 @@ const PowerUsageCard = ({ cardBackground, textColor, powerUsage, maxKwh }) => {
   return (
     <ThemedView style={[styles.card, styles.elevatedCard, { backgroundColor: cardBackground }]}>
       <View style={styles.cardHeader}>
-        <ThemedText type="defaultSemiBold" style={{ color: textColor }}>Daya</ThemedText>
+        <ThemedText type="defaultSemiBold" style={{ color: textColor }}>Daya digunakan</ThemedText>
       </View>
       <View style={styles.powerContainer}>
         <ThemedText type="title" style={{ color: textColor }}>{powerUsage.toFixed(2)}</ThemedText>
@@ -301,7 +301,7 @@ export default function HomeScreen() {
           <View style={styles.cardSpacer} />
           <StatsCard 
             title="Konsumsi" 
-            value={`${data.consumed} kWh`} 
+            value={`${data.consumed} Watt`} 
             icon="battery-charging" 
             cardBackground={cardBackground} 
             textColor={textColor} 
