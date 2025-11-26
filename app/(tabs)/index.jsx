@@ -53,8 +53,6 @@ const StatsCard = ({ title, value, icon, cardBackground, textColor }) => {
   );
 };
 
-
-
 export default function HomeScreen() {
   const { darkModeEnabled } = useThemeMode();
   const { maxKwh, saveMaxKwh } = useMaxKwh();
@@ -75,6 +73,7 @@ export default function HomeScreen() {
     powerUsage: 0,
     voltage: 0,
     current: 0,
+    power: 0, // Pastikan power ada di state awal
     consumed: 0,
     relayState: false,
     timestamp: 0
@@ -112,7 +111,8 @@ export default function HomeScreen() {
           setUsageHistory(prev => {
             const hour = new Date().getHours();
             const updated = [...prev];
-            const incrementalConsumption = newData.consumed;
+            // Gunakan power untuk incremental consumption, fallback ke consumed jika power tidak ada
+            const incrementalConsumption = newData.power || newData.consumed || 0;
             updated[hour] = Math.max(0, (updated[hour] || 0) + incrementalConsumption);
             return updated;
           });
@@ -299,9 +299,10 @@ export default function HomeScreen() {
             textColor={textColor} 
           />
           <View style={styles.cardSpacer} />
+          {/* UBAH DI SINI: Menggunakan data.power bukan data.consumed */}
           <StatsCard 
-            title="Konsumsi" 
-            value={`${data.consumed} Watt`} 
+            title="Daya" 
+            value={`${data.power} Watt`} 
             icon="battery-charging" 
             cardBackground={cardBackground} 
             textColor={textColor} 
