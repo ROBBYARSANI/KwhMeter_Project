@@ -22,7 +22,7 @@ const PowerUsageCard = ({ cardBackground, textColor, powerUsage, maxKwh }) => {
   return (
     <ThemedView style={[styles.card, styles.elevatedCard, { backgroundColor: cardBackground }]}>
       <View style={styles.cardHeader}>
-        <ThemedText type="defaultSemiBold" style={{ color: textColor }}>Daya digunakan</ThemedText>
+        <ThemedText type="defaultSemiBold" style={{ color: textColor }}>Energi digunakan</ThemedText>
       </View>
       <View style={styles.powerContainer}>
         <ThemedText type="title" style={{ color: textColor }}>{powerUsage.toFixed(2)}</ThemedText>
